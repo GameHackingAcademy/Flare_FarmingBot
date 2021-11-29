@@ -1,3 +1,15 @@
+/* 
+Referenced in https://gamehacking.academy/lesson/4/4.
+
+A hack for Flare version 1.12 that will automatically move the player towards the nearest enemy and then attack until the enemy is dead.
+
+It accomplishes this through a thread that constantly compares the current player's X and Y position to an enemy's position. 
+Depending on the position, the mouse cursor is then set to a certain angle and SendInput is used to send a mouse down event to the game.
+
+After injecting this hack, go in game and hold down the "M" key. Your character will then begin running toward the closest enemy and begin attacking them.
+
+This must be injected into the Flare process to work. One way to do this is to use a DLL injector. Another way is to enable AppInit_DLLs in the registry.
+*/
 #include <Windows.h>
 
 HANDLE flare_base;
@@ -22,6 +34,8 @@ DWORD loop_return_address;
 
 INPUT input = { 0 };
 
+// This hooks the method responsible for updating the mouse cursor
+// The main job of this code cave is retrieve the mouse's position addresses and assign them to a pointer
 __declspec(naked) void mouse_codecave() {
 	__asm {
 		call mouse_call_address
@@ -37,6 +51,8 @@ __declspec(naked) void mouse_codecave() {
 	}
 }
 
+// This hooks the method responsible for updating the player's position
+// The main job of this code cave is retrieve the player's position addresses and assign them to a pointer
 __declspec(naked) void player_codecave() {
 	__asm {
 		pushad
@@ -51,6 +67,8 @@ __declspec(naked) void player_codecave() {
 	}
 }
 
+// This hooks the method responsible for updating the enemy's position
+// The main job of this code cave is retrieve the enemy's position addresses and assign them to a pointer
 __declspec(naked) void loop_codecave() {
 	__asm {
 		pushad
@@ -64,6 +82,10 @@ __declspec(naked) void loop_codecave() {
 	}
 }
 
+// Main logic thread of the bot
+// Checks to ensure that all the pointers are assigned
+// If they are, that means an enemy is on screen. As such, we determine the position of the enemy
+// and send our player toward that position
 void injected_thread() {
 	while (true) {
 		if (player_x != NULL && player_y != NULL && enemy_x != NULL && enemy_y != NULL 
@@ -93,6 +115,10 @@ void injected_thread() {
 	}
 }
 
+// When our DLL is attached, we create several code caves and a thread
+// For each hook, unprotect the memory at the code we wish to write at
+// Then set the first opcode to E9, or jump
+// Caculate the location using the formula: new_location - original_location+5
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 	DWORD old_protect;
 
